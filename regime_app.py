@@ -85,7 +85,7 @@ RegimeIndicator = vbt.IndicatorFactory(
 @st.cache_data
 def fetch_and_process_data():
     tickers = ["BTC-USD", "ETH-USD"]
-    start_date = "2022-01-01"
+    start_date = "2016-01-01"
     end_date = "now"
 
     yf_data = vbt.YFData.download(tickers, start=start_date, end=end_date)
@@ -93,20 +93,25 @@ def fetch_and_process_data():
 
     daily_data = {}
     for ticker in tickers:
-        daily = close_prices[ticker].to_frame()
-        daily["Return"] = daily[ticker].pct_change()
+        # Handle potential null values in the data
+        daily = close_prices[ticker].dropna().to_frame()
+        
+        # Only process if we have data
+        if len(daily) > 0:
+            daily["Return"] = daily[ticker].pct_change()
 
-        regime_indicator = RegimeIndicator.run(
-            daily[ticker],
-            daily["Return"],
-            ma_short_window=21,
-            ma_long_window=88,
-            vol_short_window=21,
-            avg_vol_window=365,
-        )
-        daily["Regime"] = regime_indicator.regimes
-
-        daily_data[ticker] = daily
+            regime_indicator = RegimeIndicator.run(
+                daily[ticker],
+                daily["Return"],
+                ma_short_window=21,
+                ma_long_window=88,
+                vol_short_window=21,
+                avg_vol_window=365,
+            )
+            daily["Regime"] = regime_indicator.regimes
+            daily_data[ticker] = daily
+        else:
+            st.warning(f"No data available for {ticker}")
 
     return daily_data
 
@@ -187,8 +192,11 @@ st.subheader("Current Market Status")
 col1, col2 = st.columns(2)
 for i, (ticker, data) in enumerate(daily_data.items()):
     with col1 if i == 0 else col2:
-        st.metric(f"{ticker} Price", f"${data[ticker].iloc[-1]:.2f}")
-        st.metric(f"{ticker} Current Regime", data["Regime"].iloc[-1])
+        if len(data) > 0:  # Check if we have data
+            st.metric(f"{ticker} Price", f"${data[ticker].iloc[-1]:.2f}")
+            st.metric(f"{ticker} Current Regime", data["Regime"].iloc[-1])
+        else:
+            st.error(f"No data available for {ticker}")
 
 # User input for hypothetical returns
 st.subheader("Forecast Tomorrow's Regime")
@@ -213,5 +221,8 @@ if st.button("Forecast Regimes"):
 # Display historical price charts with regime heatmap
 st.subheader("Historical Price Charts with Regime Heatmap")
 for ticker, data in daily_data.items():
-    fig = data[ticker].vbt.overlay_with_heatmap(data["Regime"])
-    st.plotly_chart(fig)
+    if len(data) > 0:  # Check if we have data
+        fig = data[ticker].vbt.overlay_with_heatmap(data["Regime"])
+        st.plotly_chart(fig)
+    else:
+        st.error(f"No historical data available for {ticker}")
