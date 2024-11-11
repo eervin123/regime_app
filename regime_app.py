@@ -85,7 +85,7 @@ RegimeIndicator = vbt.IndicatorFactory(
 @st.cache_data
 def fetch_and_process_data():
     tickers = ["BTC-USD", "ETH-USD"]
-    start_date = "2016-01-01"
+    start_date = "2022-01-01"
     end_date = "now"
 
     yf_data = vbt.YFData.download(tickers, start=start_date, end=end_date)
